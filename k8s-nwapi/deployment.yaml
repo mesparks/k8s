@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nw-server-deployment
+  namespace: master-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nw-server
+  template:
+    metadata:
+      labels:
+        app: nw-server
+    spec:
+      securityContext:
+            fsGroup: 1000 
+            runAsUser: 1000
+      containers:
+        - name: nw-server
+          image: 547097428470.dkr.ecr.us-east-1.amazonaws.com/nw/server-api:latest
+          resources:
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+            requests:
+              memory: "500Mi"
+              cpu: "500m"
+          ports:
+            - name: httpport
+              containerPort: 8084

@@ -1,0 +1,11 @@
+---
+# This playbook initializes the EC2 with all needed roles
+- name: Instance Configuration
+  hosts: localhost
+  roles:
+    - Install_Nextworld
+    - Configure_Datadog
+    - Health_Check
+    - Tag_AWS_Resources
+    - Install_Machine_Agent
+...

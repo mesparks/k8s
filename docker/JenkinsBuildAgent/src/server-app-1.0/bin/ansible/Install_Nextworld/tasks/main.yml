@@ -1,0 +1,92 @@
+# Find Java version in use
+- name: Determine Java Version
+  shell: >
+    java -version 2>&1 |
+    grep version |
+    awk '{print $3}' |
+    sed 's/"//g' |
+    cut -d. -f1
+  register: java_version
+
+# Setup the systemd service if Java 17
+- name: Copy Systemd Service to Destination if Java 17
+  copy:
+    src: nextworld-api-j17.service
+    dest: /etc/systemd/system/nextworld-api.service
+    owner: root
+    group: root
+    mode: 0644
+  when: java_version.stdout == "17"
+
+# Setup the systemd service if NOT Java 17
+- name: Copy Systemd Service to Destination if Java Version is NOT 17
+  copy:
+    src: nextworld-api-j11.service
+    dest: /etc/systemd/system/nextworld-api.service
+    owner: root
+    group: root
+    mode: 0644
+  when: java_version.stdout != "17"
+
+# Set JVM minimum memory params
+- name: Set JVM Min Memory Parameters
+  lineinfile:
+    path: "/etc/systemd/system/nextworld-api.service"
+    search_string: '-XX:MinRAMPercentage=${NW_JVM_MEM_PERCENTAGE}"'
+    insertafter: '.*-home.*'
+    line: '    -XX:MinRAMPercentage=${NW_JVM_MEM_PERCENTAGE} \'
+    firstmatch: true
+
+# Set JVM maximum memory params
+- name: Set JVM Max Memory Parameters
+  lineinfile:
+    path: "/etc/systemd/system/nextworld-api.service"
+    search_string: '-XX:MaxRAMPercentage=${NW_JVM_MEM_PERCENTAGE}"'
+    insertafter: '.*-home.*'
+    line: '    -XX:MaxRAMPercentage=${NW_JVM_MEM_PERCENTAGE} \'
+    firstmatch: true
+
+# Download AppD zip file
+- name: Download AppDynamics Agent
+  aws_s3:
+    bucket: "{{ ansible_local.environment.S3_BUCKET }}"
+    object: "/ops/appdynamics/appdynamics.zip"
+    dest: "{{ ansible_local.environment.NW_HOME_DIR }}/appdynamics.zip"
+    mode: get
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Extract Appd zip
+- name: "Extract Appdynamics Zip File"
+  ansible.builtin.unarchive:
+    src: "{{ ansible_local.environment.NW_HOME_DIR }}/appdynamics.zip"
+    dest: "{{ ansible_local.environment.NW_HOME_DIR }}"
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Enable Appd in service file
+- name: Enable Appdynamics in Java Service File
+  lineinfile:
+    path: "/etc/systemd/system/nextworld-api.service"
+    search_string: '-javaagent:/home/nextw/appdynamics/javaagent.jar'
+    insertafter: '.*-home.*'
+    line: '    -javaagent:/home/nextw/appdynamics/javaagent.jar \'
+    firstmatch: true
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Add log4j vulnerability mitigation
+- name: Log4j Vulnerability Mitigation for AppDynamics
+  lineinfile:
+    path: "/etc/systemd/system/nextworld-api.service"
+    search_string: '-Dappdynamics.log4j2.formatMsgNoLookups=true'
+    insertafter: '.*-javaagent.*'
+    line: '    -Dappdynamics.log4j2.formatMsgNoLookups=true \'
+    firstmatch: true
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Enable and start the nextworld-api service
+- name: Start Nextworld Service
+  systemd:
+    daemon_reload: true
+    name: nextworld-api
+    state: started
+    enabled: yes
+...

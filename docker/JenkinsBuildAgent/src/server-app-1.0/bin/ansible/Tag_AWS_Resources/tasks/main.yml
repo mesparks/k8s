@@ -1,0 +1,46 @@
+---
+# tasks file for Tag_AWS_Resources
+
+# Grab the volume ID to tag
+- ec2_metadata_facts:
+- name: Gathering Information
+  ec2_vol_info:
+    region: "{{ ansible_ec2_instance_identity_document_region }}"
+    filters:
+      attachment.instance-id: "{{ ansible_ec2_instance_id }}"
+  register: vol_info
+
+# Set the volumes variable to the list of volumes for the EC2
+- name: Set "volumes" Variable
+  set_fact:
+    volumes: "{{ vol_info['volumes'] }}"
+
+# Pull the volume IDs out of the volumes variable
+- name: Create List of Volume IDs
+  set_fact:
+    vol_ids: "{{ vol_ids + [ item['id'] ] }}"
+  with_items:
+    - "{{ volumes }}"
+
+# Grab tag info for EC2
+- name: Pull Tags From EC2
+  ec2_tag_info:
+    region: "{{ ansible_ec2_instance_identity_document_region }}"
+    resource: "{{ ansible_ec2_instance_id }}"
+  register: ec2_tags
+
+# Tag the volume ID with the necessary tags
+- name: Create Tags
+  ec2_vol:
+    region: "{{ ansible_ec2_instance_identity_document_region }}"
+    instance: "{{ ansible_ec2_instance_id }}"
+    id: "{{ item }}"
+    state: present
+    tags:
+      location: "{{ ec2_tags.tags.location }}"
+      release: "{{ ec2_tags.tags.release }}"
+      environment: "{{ ec2_tags.tags.environment }}"
+      Name: "{{ ec2_tags.tags.Name }}"
+  with_items:
+    - "{{ vol_ids }}"
+...

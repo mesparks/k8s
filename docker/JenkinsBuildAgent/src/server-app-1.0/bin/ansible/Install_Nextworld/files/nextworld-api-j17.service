@@ -1,0 +1,74 @@
+## Copyright (C) 2016 Nextworld llc (http://www.nextworld.net)
+#
+# Author: Bruce Clounie
+#
+# Use: `sudo systemctl start|stop|status nextworld`
+#
+##
+## TODO List when adapting:
+#
+# 0. NOTE: Systemd doesn't do env vars substitution in the Environment assignments.
+# 1. Replace all instances of $USER's value with your user (should be 2-3 instances)
+# 2. We use a PID in the $USER's directory, because:
+#    * When we use /var/run/jsvc.pid, it fails due to permissions
+#    * One possible TODO - make this use the root user instead.
+# 3. Replace any other environmental variables as needed (only USER/PID have the #0 problem)
+#
+##
+[Unit]
+Description=Nextworld API Server
+# Run after the network starts
+After=network.target
+[Service]
+# The path to Jsvc
+Environment=EXEC=/usr/bin/jsvc
+# The path to the folder containing nwserver jar
+Environment=FILE_PATH=/home/nextw/server-app-1.0/lib
+# The log path to be used with Dnwlogdir
+Environment=LOG_PATH=/home/nextw/log
+# The path to the folder containing the java runtime
+#Environment=JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto.x86_64
+# The path to the environment variables folder
+EnvironmentFile=/etc/environment
+# The fully qualified name of the class to execute
+Environment="CLASS=net.nextworld.server.Startup"
+# The file that will contain our process identification number
+# Needed to stop the process; also lets other scripts know where to find it
+Environment=PID=/home/nextw/jsvc-nw.pid
+# System.out writes to this file...
+Environment="LOG_OUT=/home/nextw/log/nwserver.log"
+Environment="LOG_ERR=/home/nextw/log/nwserver.log"
+ExecStart=/usr/bin/jsvc \
+    -home ${JAVA_HOME} \
+    -Dnwlogdir=${LOG_PATH}/ \
+    -Dlog4j2.formatMsgNoLookups=true \
+    -Dfile.encoding=utf8 \
+    -cp ${FILE_PATH}/*:. \
+    -XX:NewRatio=3 \
+    -XX:-OmitStackTraceInFastThrow \
+    -server \
+    -outfile ${LOG_OUT} \
+    -pidfile ${PID} \
+    -errfile ${LOG_ERR} \
+    --add-opens=java.base/java.util=ALL-UNNAMED \
+    --add-opens=java.base/java.lang=ALL-UNNAMED \
+    --add-opens=java.base/sun.security.ssl=ALL-UNNAMED \
+    $1 \
+    ${CLASS} \
+    "-wait 2000"
+ExecStop=/usr/bin/jsvc \
+    -stop \
+    -home ${JAVA_HOME} \
+    -Dnwlogdir=${LOG_PATH}/ \
+    -cp ${CLASS_PATH} \
+    -outfile ${LOG_OUT} \
+    -pidfile ${PID} \
+    -errfile ${LOG_ERR} \
+    $1 \
+    ${CLASS} \
+Restart=on-failure
+Type=forking
+# Does not allow variable expansion
+PIDFile=/home/nextw/jsvc-nw.pid
+[Install]
+WantedBy=default.target

@@ -1,0 +1,15 @@
+---
+# tasks file for Health_Check
+
+# Perform the Nextworld API endpoint health check
+- name: Checking For Response
+  uri:
+    url: http://localhost:8084/HealthCheck
+    method: GET
+  register: _result
+  until: _result.status == 200
+  retries: 60
+  delay: 1
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags:
+    - health_check

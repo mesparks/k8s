@@ -1,0 +1,41 @@
+---
+# tasks file for Configure_Datadog
+
+# Grab the top level folder and release (Dev)
+- name: Get Top Level Folder & Release When Dev
+  set_fact:
+    NW_RELEASE: "{{ ansible_local.environment.NW_GIT_BRANCH.split('_')[0] }}"
+  when: ansible_local.environment.NW_GIT_BRANCH[0] | regex_search('[a-zA-Z]')
+
+# Grab the top level folder and release (Prod)
+- name: Get Top Level Folder & Release When Prod
+  set_fact:
+    NW_RELEASE: "{{ ansible_local.environment.NW_GIT_BRANCH.split('.')[:2] | join('.') }}"
+  when: ansible_local.environment.NW_GIT_BRANCH[0] | regex_search('[0-9]')
+
+# Copy S3 bucket file for Datadog
+#- name: Copy Datadog Install Script
+#  aws_s3:
+#    bucket: "{{ ansible_local.environment.S3_BUCKET }}"
+#    object: "/logging/datadog/{{ NW_RELEASE }}/install-datadog.sh"
+#    dest: "{{ ansible_local.environment.NW_HOME_DIR }}/install-datadog.sh"
+#    mode: get
+
+# Remove the APT commands as ec2 linux uses yum
+- name: Comment Out APT commands
+  lineinfile:
+    path: "{{ ansible_local.environment.NW_HOME_DIR }}/install-datadog.sh"
+    regexp: "^sudo apt*"
+    state: absent
+
+# Kick off Datadog installation script to configure yaml config
+- name: Configure YAML Config Using Installation Script
+  shell: >
+    NW_DATADOG_API_KEY={{ ansible_local.environment.NW_DATADOG_API_KEY }}
+    NW_RELEASE={{ NW_RELEASE }}
+    NW_GIT_BRANCH={{ ansible_local.environment.NW_GIT_BRANCH }}
+    NW_STACK_NAME={{ ansible_local.environment.NW_STACK_NAME }}
+    NW_STACK_TYPE={{ ansible_local.environment.NW_STACK_TYPE }}
+    S3_BUCKET={{ ansible_local.environment.S3_BUCKET }}
+    bash /home/nextw/install-datadog.sh
+...

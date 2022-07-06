@@ -1,0 +1,53 @@
+---
+# Install procps prerequisite
+- name: Install procps
+  yum:
+    name: procps
+    state: present
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Download AppD Machine Agent RPM
+- name: Download AppDynamics Machine Agent
+  aws_s3:
+    bucket: "{{ ansible_local.environment.S3_BUCKET }}"
+    object: "/ops/appdynamics/machine_agent.rpm"
+    dest: "/tmp/machine_agent.rpm"
+    mode: get
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Install the Machine Agent from AppD
+- name: Install AppD Machine Agent
+  yum:
+    name: /tmp/machine_agent.rpm
+    state: present
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Download AppD Machine Agent Config File
+- name: Replace the Config File for AppD Machine Agent
+  copy:
+    src: controller-info.xml
+    dest: /opt/appdynamics/machine-agent/conf/controller-info.xml
+    owner: appdynamics-machine-agent
+    group: appdynamics-machine-agent
+    mode: 0600
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Download AppD Machine Agent Service File
+- name: Replace the Service File for AppD Machine Agent
+  copy:
+    src: appdynamics-machine-agent.service
+    dest: /etc/systemd/system/appdynamics-machine-agent.service
+    owner: root
+    group: root
+    mode: 0644
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+
+# Reload daemon and start service
+- name: Start AppD Machine Agent Service
+  systemd:
+    daemon_reload: true
+    name: appdynamics-machine-agent
+    state: started
+    enabled: yes
+  when: ansible_local.environment.ENABLE_APPD|default(false)|bool == true
+...
